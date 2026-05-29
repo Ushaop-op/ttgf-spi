@@ -18,7 +18,7 @@ module spi_slave (
     reg [2:0] cs_n_sync;
     reg [1:0] mosi_sync;
 
-    always @(posedby clk or negedge rst_n) begin
+    always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             sclk_sync <= 3'b000;
             cs_n_sync <= 3'b111;
