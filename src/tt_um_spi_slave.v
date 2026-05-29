@@ -1,73 +1,62 @@
-/*
- * Copyright (c) 2024 Your Name
- * SPDX-License-Identifier: Apache-2.0
- *
- * tt_um_spi_slave.v — Top-level wrapper (Tiny Tapeout standard ports)
- *
- * SPI bus is on the bidirectional pins (uio):
- *   uio_in[0]  = SCLK
- *   uio_in[1]  = MOSI
- *   uio_in[2]  = CS (active low)
- *   uio_out[3] = MISO
- *   uio_out[4] = BUSY (high while transaction in progress)
- *
- * uo_out[7:0] = live value of register 0 (visible on output pins)
- */
-
 `default_nettype none
 
 module tt_um_spi_slave (
-    input  wire [7:0] ui_in,    // unused
-    output wire [7:0] uo_out,   // reg[0] live output
-    input  wire [7:0] uio_in,   // SPI SCLK/MOSI/CS
-    output wire [7:0] uio_out,  // SPI MISO + BUSY
-    output wire [7:0] uio_oe,   // direction: 1=output
-    input  wire       ena,
-    input  wire       clk,
-    input  wire       rst_n
+    input  wire [7:0] ui_in,    // Dedicated inputs
+    output wire [7:0] uo_out,   // Dedicated outputs
+    input  wire [7:0] uio_in,   // IOs: Input path
+    output wire [7:0] uio_out,  // IOs: Output path
+    output wire [7:0] uio_oe,   // IOs: Enable path (1 = out, 0 = in)
+    input  wire       ena,      // design enable
+    input  wire       clk,      // clock
+    input  wire       rst_n     // reset_n - low to reset
 );
 
-    // ── Internal wires ────────────────────────────────────────
+    // Map inputs from Bidirectional Pins
+    wire sclk = uio_in[0];
+    wire mosi = uio_in[1];
+    wire cs_n = uio_in[2];
+    wire miso;
+
+    // Output driver configuration for Bidirectional control line maps
+    assign uio_out[0] = 1'b0;
+    assign uio_out[1] = 1'b0;
+    assign uio_out[2] = 1'b0;
+    assign uio_out[3] = miso; // MISO driven out
+    assign uio_out[7:4] = 4'b0000;
+
+    // Define direction rules: pin 3 is output, others are input
+    assign uio_oe = 8'b00001000; 
+
+    // Internal routing nets
     wire [2:0] reg_addr;
     wire [7:0] reg_wdata;
     wire       reg_we;
     wire [7:0] reg_rdata;
-    wire [7:0] reg0_out;
-    wire       miso;
-    wire       busy;
 
-    // ── SPI slave ─────────────────────────────────────────────
-    spi_slave u_spi (
-        .clk       (clk),
-        .rst_n     (rst_n),
-        .sclk      (uio_in[0]),
-        .mosi      (uio_in[1]),
-        .cs_n      (uio_in[2]),
-        .miso      (miso),
-        .busy      (busy),
-        .reg_addr  (reg_addr),
-        .reg_wdata (reg_wdata),
-        .reg_we    (reg_we),
-        .reg_rdata (reg_rdata)
+    // Unused input wires handled cleanly
+    wire [7:0] unused_inputs = ui_in;
+
+    spi_slave spi_core (
+        .clk(clk),
+        .rst_n(rst_n),
+        .sclk(sclk),
+        .mosi(mosi),
+        .miso(miso),
+        .cs_n(cs_n),
+        .reg_addr(reg_addr),
+        .reg_wdata(reg_wdata),
+        .reg_we(reg_we),
+        .reg_rdata(reg_rdata)
     );
 
-    // ── Register file ─────────────────────────────────────────
-    reg_file u_regs (
-        .clk      (clk),
-        .rst_n    (rst_n),
-        .addr     (reg_addr),
-        .wdata    (reg_wdata),
-        .we       (reg_we),
-        .rdata    (reg_rdata),
-        .reg0_out (reg0_out)
+    reg_file storage_core (
+        .clk(clk),
+        .rst_n(rst_n),
+        .addr(reg_addr),
+        .wdata(reg_wdata),
+        .we(reg_we),
+        .rdata(reg_rdata),
+        .reg0_out(uo_out) // Outputs Register 0 states to local dedicated LEDs
     );
-
-    // ── Outputs ───────────────────────────────────────────────
-    assign uo_out     = reg0_out;     // reg[0] visible on all 8 output pins
-
-    assign uio_out    = 8'b0001_1000; // bit4=BUSY, bit3=MISO (others 0)
-    assign uio_oe     = 8'b0001_1000; // bit4 and bit3 are outputs
-    assign uio_out[3] = miso;
-    assign uio_out[4] = busy;
 
 endmodule
