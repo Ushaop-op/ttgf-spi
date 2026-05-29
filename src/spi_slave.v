@@ -77,7 +77,9 @@ module spi_slave (
                             state    <= STATE_DATA;
                             bit_cnt  <= 3'd0;
                             is_read  <= shift_reg[6]; // Bit 7 acts as Read/Write flag
-                            reg_addr <= {shift_reg[5:0], mosi_sync[1]}[2:0];
+                            
+                            //  FIXED LINE: Grab the lowest 3 bits cleanly from the shifting logic
+                            reg_addr <= {shift_reg[1:0], mosi_sync[1]}; 
                         end
                     end
                 end
